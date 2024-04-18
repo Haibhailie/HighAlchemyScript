@@ -23,6 +23,16 @@ public class HighAlchemyGraphicsContext extends ScriptGraphicsContext {
                     ImGui.Text("My scripts state is: " + script.getBotState());
                     ImGui.EndTabItem();
                 }
+                if (ImGui.Button("Start")) {
+                    //button has been clicked
+                    script.setBotState(HighAlchemyScript.BotState.BANKING);
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("Stop")) {
+                    //has been clicked
+                    script.setBotState(HighAlchemyScript.BotState.IDLE);
+                }
+                ImGui.EndTabItem();
                 ImGui.EndTabBar();
             }
             ImGui.End();
