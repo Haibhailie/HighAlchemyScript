@@ -19,8 +19,8 @@ public class HighAlchemyGraphicsContext extends ScriptGraphicsContext {
         if (ImGui.Begin("My script", ImGuiWindowFlag.None.getValue())) {
             if (ImGui.BeginTabBar("My bar", ImGuiWindowFlag.None.getValue())) {
                 if (ImGui.BeginTabItem("Settings", ImGuiWindowFlag.None.getValue())) {
-                    ImGui.Text("Welcome to my script!");
-                    ImGui.Text("My scripts state is: " + script.getBotState());
+                    ImGui.Text("Auto High Level Alchemy bot.");
+                    ImGui.Text("Script state is: " + script.getBotState());
                     ImGui.EndTabItem();
                 }
                 if (ImGui.Button("Start")) {
@@ -33,8 +33,15 @@ public class HighAlchemyGraphicsContext extends ScriptGraphicsContext {
                     script.setBotState(HighAlchemyScript.BotState.IDLE);
                 }
                 ImGui.EndTabItem();
-                ImGui.EndTabBar();
             }
+            if (ImGui.BeginTabItem("Stats", ImGuiWindowFlag.None.getValue())) {
+                ImGui.Text("Runtime: " + script.formatTime(script.getRunTime()));
+                ImGui.Text("Items Alched: " + script.getItemsAlched());
+                ImGui.Text("Overall Profit: " + script.getProfit());
+                ImGui.Text("Profit per hour: " + script.getProfitPerHour());
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
             ImGui.End();
         }
 

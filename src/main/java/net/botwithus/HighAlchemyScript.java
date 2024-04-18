@@ -23,13 +23,17 @@ import net.botwithus.rs3.script.LoopingScript;
 import net.botwithus.rs3.script.config.ScriptConfig;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 
 public class HighAlchemyScript extends LoopingScript {
 
     private BotState botState = BotState.IDLE;
     private Random random = new Random();
-    private final Area GE = new Area.Rectangular(new Coordinate(3156,3494,0), new Coordinate(3170,3486,0));
+    private volatile long profit = 0;
+    private volatile long itemsAlched = 0;
+    private volatile long runTime = 1;
+    private volatile long startTime;
 
     public HighAlchemyScript(String s, ScriptConfig scriptConfig, ScriptDefinition scriptDefinition) {
         super(s, scriptConfig, scriptDefinition);
@@ -63,47 +67,94 @@ public class HighAlchemyScript extends LoopingScript {
             return MiniMenu.interact(ComponentAction.COMPONENT.getType(), 1, index, COMPONENT_UID);
         }
 
-        public int getComponentUID() {
-            return COMPONENT_UID;
-        }
     }
 
     @Override
     public boolean initialize() {
         super.initialize();
+        startTime = System.currentTimeMillis();
         subscribe(ChatMessageEvent.class, chatMessageEvent -> {
-            //more events available at https://botwithus.net/javadoc/net.botwithus.rs3/net/botwithus/rs3/events/impl/package-summary.html
-            println("Chatbox message received: %s", chatMessageEvent.getMessage());
+            if (chatMessageEvent.getMessage().contains("coins have been added to your money pouch.")) {
+                try {
+                    println("Received chat message: " + chatMessageEvent.getMessage());
+                    String[] parts = chatMessageEvent.getMessage().split(" ");
+                    parts[0] = parts[0].replaceAll("[^\\d]", "");
+                    long addedProfit = Long.parseLong(parts[0]);
+                    addProfit(addedProfit);
+                    incrementItemsAlched();
+                    println("Added profit: " + addedProfit + ", Total profit: " + profit);
+                    println("Items alched: " + itemsAlched);
+                } catch (NumberFormatException e) {
+                    println("Failed to parse profit: " + e.getMessage());
+                }
+            }
         });
         return true;
     }
 
+    private synchronized void addProfit(long amount) {
+        profit += amount;
+    }
+
+    private synchronized void incrementItemsAlched() {
+        itemsAlched++;
+    }
+
+    public long getRunTime() {
+        return (System.currentTimeMillis() - startTime) / 1000; // Convert milliseconds to seconds
+    }
+
+    public long getProfit() {
+        return profit;
+    }
+
+    public long getProfitPerHour() {
+        if (getRunTime() > 0) {
+            return (profit * 3600) / getRunTime(); // Convert per second profit to per hour
+        }
+        return 0;
+    }
+
+    public String formatTime(long seconds) {
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long secs = seconds % 60;
+        return String.format("%02d:%02d:%02d", hours, minutes, secs);
+    }
+
+    public long getItemsAlched() {
+        return itemsAlched;
+    }
+
     @Override
     public void onLoop() {
-        println("The loop has begun!");
+        if (botState == BotState.IDLE) {
+            println("Script is idle. No operations will be performed.");
+            Execution.delay(random.nextLong(3000,5000)); // Wait before checking the state again.
+            return;
+        }
+
+        println("Script initialized.");
         Execution.delay(random.nextLong(1000,3000));
         LocalPlayer player = Client.getLocalPlayer();
-        assert player != null;
-        handleBanking(player);
-
-        if (player == null || Client.getGameState() != Client.GameState.LOGGED_IN || botState == BotState.IDLE) {
-            println("Player is null or not logged in, or we're idle.");
+        if (player == null || Client.getGameState() != Client.GameState.LOGGED_IN) {
+            println("Player is null or not logged in.");
             Execution.delay(random.nextLong(3000,7000));
             return;
         }
 
         switch (botState) {
-            case IDLE -> {
-                println("We're idle!");
-                Execution.delay(random.nextLong(1000,3000));
-            }
             case ALCHING -> {
-                //do some code that handles your alchemy
-                Execution.delay(handleAlchemy(player));
+                println("Proceeding with alchemy.");
+                Execution.delay(handleAlchemy(player)); // handle your alchemy logic
             }
             case BANKING -> {
-                //handle your banking logic, etc
-                Execution.delay(handleBanking(player));
+                println("Proceeding with banking.");
+                Execution.delay(handleBanking(player)); // handle your banking logic
+            }
+            default -> {
+                println("Unhandled state.");
+                Execution.delay(random.nextLong(1000,3000));
             }
         }
     }
@@ -125,8 +176,8 @@ public class HighAlchemyScript extends LoopingScript {
             SceneObject banker = SceneObjectQuery.newQuery().name("Banker").option("Bank").results().nearest();
             if (banker != null)
             {
-                println("Bank not found.");
                 botState = BotState.IDLE;
+                println("Bank not found.");
             }
             else
             {
@@ -142,36 +193,56 @@ public class HighAlchemyScript extends LoopingScript {
 
     private long handleAlchemy(LocalPlayer player) {
         if (player.isMoving()) {
-            return random.nextLong(3000,5000);
+            return random.nextLong(1500, 3000);
         }
-
-        List<Item> items = Backpack.getItems();
-        if (items.size() > 1) {
-            // Start iterating from the second item (index 1)
-            for (int i = 1; i < items.size(); i++) {
-                if(botState.equals(BotState.IDLE)) {
-                    break;
+        if (checkRequirements()) {
+            List<Item> items = Backpack.getItems();
+            if (items.size() > 1) {
+                // Start iterating from the second item (index 1)
+                for (int i = 1; i < items.size(); i++) {
+                    if (botState.equals(BotState.IDLE)) {
+                        break;
+                    }
+                    Item item = items.get(i);
+                    if (item != null) {
+                        // Process each item as needed
+                        println("Processing item: " + item.getName() + ", ID: " + item.getId() + ", Slot: " + i);
+                        performHighAlchemy(item);
+                    }
                 }
-                Item item = items.get(i);
-                if (item != null) {
-                    // Process each item as needed
-                    println("Processing item: " + item.getName() + ", ID: " + item.getId() + ", Slot: " + i);
-                    performHighAlchemy(item);
-                }
+            } else {
+                println("Not enough items in backpack to skip the first one.");
             }
-        } else {
-            println("Not enough items in backpack to skip the first one.");
+            botState = BotState.BANKING;
         }
+        else{
+            println("Requirements not met. Looks like you're out of nature runes or alchable items. Idling.");
+            botState = BotState.IDLE;
+        }
+        return random.nextLong(1500, 3000);
+    }
+        private boolean checkRequirements(){
+        List<Item> items = Backpack.getItems();
+        boolean hasNatureRune = false;
+        int itemCount = 0;
 
-        botState = BotState.BANKING;
-        return random.nextLong(3000,5000);
+        for (Item item : items) {
+            if (Objects.equals(item.getName(), "Nature rune")) {
+                hasNatureRune = true;
+                println("Nature rune found successfully.");
+            } else {
+                itemCount++;
+                println("Alchable item found: " + item.getName() + ", ID: " + item.getId() + ", Slot: " + item.getSlot());
+            }
+        }
+        return hasNatureRune && itemCount > 0;
     }
 
     private void performHighAlchemy(Item item) {
         Spell.HIGH_ALCHEMY.select();
-        Execution.delay(random.nextLong(2000, 4000)); // A delay to ensure the spell is activated
+        Execution.delay(random.nextLong(1000,2000)); // A delay to ensure the spell is activated
         MiniMenu.interact(SelectableAction.SELECT_COMPONENT_ITEM.getType(), 0, item.getSlot(), 96534533);
-        Execution.delay(random.nextLong(3000,5000));
+        Execution.delay(random.nextLong(1500,3000));
     }
 
     public BotState getBotState() {
