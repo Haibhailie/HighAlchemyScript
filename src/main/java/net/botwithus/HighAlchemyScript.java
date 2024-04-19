@@ -130,16 +130,16 @@ public class HighAlchemyScript extends LoopingScript {
     public void onLoop() {
         if (botState == BotState.IDLE) {
             println("Script is idle. No operations will be performed.");
-            Execution.delay(random.nextLong(3000,5000)); // Wait before checking the state again.
+            Execution.delay(random.nextLong(3000, 5000)); // Wait before checking the state again.
             return;
         }
 
         println("Script initialized.");
-        Execution.delay(random.nextLong(1000,3000));
+        Execution.delay(random.nextLong(1000, 3000));
         LocalPlayer player = Client.getLocalPlayer();
         if (player == null || Client.getGameState() != Client.GameState.LOGGED_IN) {
             println("Player is null or not logged in.");
-            Execution.delay(random.nextLong(3000,7000));
+            Execution.delay(random.nextLong(3000, 7000));
             return;
         }
 
@@ -154,7 +154,7 @@ public class HighAlchemyScript extends LoopingScript {
             }
             default -> {
                 println("Unhandled state.");
-                Execution.delay(random.nextLong(1000,3000));
+                Execution.delay(random.nextLong(3000, 5000));
             }
         }
     }
@@ -162,25 +162,21 @@ public class HighAlchemyScript extends LoopingScript {
     private long handleBanking(LocalPlayer player) {
 
         if (player.isMoving()) {
-            return random.nextLong(3000,5000);
+            return random.nextLong(3000, 5000);
         }
 
         if (Bank.isOpen()) {
             println("Bank is open!");
             botState = BotState.BANKING;
             Bank.loadLastPreset();
-            return random.nextLong(1000,3000);
-        }
-        else
-        {
+            return random.nextLong(1000, 3000);
+        } else {
             SceneObject banker = SceneObjectQuery.newQuery().name("Banker").option("Bank").results().nearest();
-            if (banker != null)
-            {
+            if (banker != null) {
                 botState = BotState.IDLE;
                 println("Bank not found.");
-            }
-            else
-            {
+                return random.nextLong(1000, 3000);
+            } else {
                 botState = BotState.BANKING;
                 println("Yay, we found our bank.");
                 Bank.loadLastPreset();
@@ -188,20 +184,26 @@ public class HighAlchemyScript extends LoopingScript {
         }
 
         botState = BotState.ALCHING;
-        return random.nextLong(4500,6000);
+        return random.nextLong(4500, 6000);
     }
 
     private long handleAlchemy(LocalPlayer player) {
         if (player.isMoving()) {
             return random.nextLong(1500, 3000);
         }
+
+        if (getBotState() == BotState.IDLE) {
+            return random.nextLong(1500, 3000);
+        }
+
         if (checkRequirements()) {
             List<Item> items = Backpack.getItems();
             if (items.size() > 1) {
                 // Start iterating from the second item (index 1)
                 for (int i = 1; i < items.size(); i++) {
-                    if (botState.equals(BotState.IDLE)) {
-                        break;
+                    if (getBotState() == BotState.IDLE) {
+                        println("Bot state is idle. Stopping alchemy.");
+                        return random.nextLong(1500, 3000);
                     }
                     Item item = items.get(i);
                     if (item != null) {
@@ -214,14 +216,14 @@ public class HighAlchemyScript extends LoopingScript {
                 println("Not enough items in backpack to skip the first one.");
             }
             botState = BotState.BANKING;
-        }
-        else{
+        } else {
             println("Requirements not met. Looks like you're out of nature runes or alchable items. Idling.");
             botState = BotState.IDLE;
         }
         return random.nextLong(1500, 3000);
     }
-        private boolean checkRequirements(){
+
+    private boolean checkRequirements() {
         List<Item> items = Backpack.getItems();
         boolean hasNatureRune = false;
         int itemCount = 0;
@@ -240,9 +242,9 @@ public class HighAlchemyScript extends LoopingScript {
 
     private void performHighAlchemy(Item item) {
         Spell.HIGH_ALCHEMY.select();
-        Execution.delay(random.nextLong(1000,2000)); // A delay to ensure the spell is activated
+        Execution.delay(random.nextLong(1000, 2000)); // A delay to ensure the spell is activated
         MiniMenu.interact(SelectableAction.SELECT_COMPONENT_ITEM.getType(), 0, item.getSlot(), 96534533);
-        Execution.delay(random.nextLong(1500,3000));
+        Execution.delay(random.nextLong(1500, 3000));
     }
 
     public BotState getBotState() {
